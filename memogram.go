@@ -518,12 +518,32 @@ func (s *Service) searchHandler(ctx context.Context, b *bot.Bot, m *models.Updat
 		})
 	} else {
 		for _, memo := range results.Msg.GetMemos() {
-			tgMessage := memo.Name + "\n" + memo.Content
-			b.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID: m.Message.Chat.ID,
-				Text:   tgMessage,
-			})
+			b.SendMessage(ctx, s.searchResultMessage(m.Message.Chat.ID, memo))
 		}
+	}
+}
+
+func (s *Service) searchResultMessage(chatID int64, memo *v1pb.Memo) *bot.SendMessageParams {
+	baseURL := s.config.ServerAddr
+	if s.instanceProfile != nil && s.instanceProfile.InstanceUrl != "" {
+		baseURL = s.instanceProfile.InstanceUrl
+	}
+	baseURL = strings.TrimRight(strings.TrimPrefix(baseURL, "dns:"), "/")
+	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
+		baseURL = "http://" + baseURL
+	}
+
+	return &bot.SendMessageParams{
+		ChatID: chatID,
+		Text:   memo.Name + "\n" + memo.Content,
+		Entities: []models.MessageEntity{
+			{
+				Type:   models.MessageEntityTypeTextLink,
+				Offset: 0,
+				Length: len(utf16.Encode([]rune(memo.Name))),
+				URL:    baseURL + "/" + memo.Name,
+			},
+		},
 	}
 }
 
